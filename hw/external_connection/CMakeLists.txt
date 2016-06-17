@@ -1,0 +1,19 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+PROJECT(external_connection C)
+
+SET(PREFIX ${CMAKE_INSTALL_PREFIX})
+
+INCLUDE(FindPkgConfig)
+pkg_check_modules(external_connection_pkgs REQUIRED hwcommon dlog glib-2.0)
+
+FOREACH(flag ${external_connection_pkgs_CFLAGS})
+	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")
+ENDFOREACH(flag)
+
+SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} -fvisibility=hidden")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${EXTRA_CFLAGS}")
+
+ADD_LIBRARY(${PROJECT_NAME} MODULE external_connection.c ../shared.c ../udev.c)
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${external_connection_pkgs_LDFLAGS})
+SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES PREFIX "")
+INSTALL(TARGETS ${PROJECT_NAME} DESTINATION ${LIB_INSTALL_DIR}/hw COMPONENT RuntimeLibraries)

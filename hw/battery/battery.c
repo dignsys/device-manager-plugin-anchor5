@@ -42,21 +42,9 @@ static int get_power_source(char **src)
 	if (!src)
 		return -EINVAL;
 
-	ret = sys_get_int(BATTERY_ROOT_PATH"/"POWER_SOURCE_AC"/online", &val);
+	ret = sys_get_int(BATTERY_ROOT_PATH"/rk-ac/online", &val);
 	if (ret >= 0 && val > 0) {
 		*src = POWER_SOURCE_AC;
-		return 0;
-	}
-
-	ret = sys_get_int(BATTERY_ROOT_PATH"/"POWER_SOURCE_USB"/online", &val);
-	if (ret >= 0 && val > 0) {
-		*src = POWER_SOURCE_USB;
-		return 0;
-	}
-
-	ret = sys_get_int(BATTERY_ROOT_PATH"/"POWER_SOURCE_WIRELESS"/online", &val);
-	if (ret >= 0 && val > 0) {
-		*src = POWER_SOURCE_WIRELESS;
 		return 0;
 	}
 
@@ -107,35 +95,42 @@ static void uevent_delivered(struct udev_device *dev)
 		return;
 	info.health = val;
 
-	val = (char *)udev_device_get_property_value(dev, "POWER_SUPPLY_ONLINE");
-	if (!val)
-		return;
-	info.online = atoi(val);
-
 	val = (char *)udev_device_get_property_value(dev, "POWER_SUPPLY_PRESENT");
 	if (!val)
 		return;
 	info.present = atoi(val);
+
+	val = (char *)udev_device_get_property_value(dev, "POWER_SUPPLY_ONLINE");
+	if (val)
+		info.online = atoi(val);
+	else
+		info.online = info.present;
 
 	val = (char *)udev_device_get_property_value(dev, "POWER_SUPPLY_CAPACITY");
 	if (!val)
 		return;
 	info.capacity = atoi(val);
 
-	val = (char *)udev_device_get_property_value(dev, "POWER_SUPPLY_CURRENT_NOW");
-	if (!val)
-		return;
-	info.current_now = atoi(val); /* uA */
-
-	val = (char *)udev_device_get_property_value(dev, "POWER_SUPPLY_CURRENT_AVG");
-	if (!val)
-		return;
-	info.current_average = atoi(val); /* uA */
-
 	ret = get_power_source(&val);
 	if (ret < 0)
 		return;
 	info.power_source = val;
+
+	val = (char *)udev_device_get_property_value(dev, "POWER_SUPPLY_CURRENT_NOW");
+	if (val)
+		info.current_now = atoi(val); /* uA */
+	else {
+		if (strncmp(info.power_source, POWER_SOURCE_NONE, sizeof(POWER_SOURCE_NONE)))
+			info.current_now = 1000; /* current entering the battery from charge source */
+		else
+			info.current_now = -1000; /* current discharging from the battery */
+	}
+
+	val = (char *)udev_device_get_property_value(dev, "POWER_SUPPLY_CURRENT_AVG");
+	if (val)
+		info.current_average = atoi(val); /* uA */
+	else
+		info.current_average = info.current_now;
 
 	udata.updated_cb(&info, udata.data);
 }
@@ -193,7 +188,7 @@ static int battery_get_current_state(
 
 	info.name = BATTERY_HARDWARE_DEVICE_ID;
 
-	path = BATTERY_ROOT_PATH"/battery/status";
+	path = BATTERY_ROOT_PATH"/rk-bat/status";
 	ret = sys_get_str(path, status, sizeof(status));
 	if (ret < 0) {
 		_E("Failed to get value of (%s, %d)", path, ret);
@@ -202,7 +197,7 @@ static int battery_get_current_state(
 	remove_not_string(status);
 	info.status = status;
 
-	path = BATTERY_ROOT_PATH"/battery/health";
+	path = BATTERY_ROOT_PATH"/rk-bat/health";
 	ret = sys_get_str(path, health, sizeof(health));
 	if (ret < 0) {
 		_E("Failed to get value of (%s, %d)", path, ret);
@@ -219,15 +214,7 @@ static int battery_get_current_state(
 	remove_not_string(power_source);
 	info.power_source = power_source;
 
-	path = BATTERY_ROOT_PATH"/battery/online";
-	ret = sys_get_int(path, &val);
-	if (ret < 0) {
-		_E("Failed to get value of (%s, %d)", path, ret);
-		return ret;
-	}
-	info.online = val;
-
-	path = BATTERY_ROOT_PATH"/battery/present";
+	path = BATTERY_ROOT_PATH"/rk-bat/present";
 	ret = sys_get_int(path, &val);
 	if (ret < 0) {
 		_E("Failed to get value of (%s, %d)", path, ret);
@@ -235,7 +222,14 @@ static int battery_get_current_state(
 	}
 	info.present = val;
 
-	path = BATTERY_ROOT_PATH"/battery/capacity";
+	path = BATTERY_ROOT_PATH"/rk-bat/online";
+	ret = sys_get_int(path, &val);
+	if (ret == 0)
+		info.online = val;
+	else
+		info.online = info.present;
+
+	path = BATTERY_ROOT_PATH"/rk-bat/capacity";
 	ret = sys_get_int(path, &val);
 	if (ret < 0) {
 		_E("Failed to get value of (%s, %d)", path, ret);
@@ -243,21 +237,23 @@ static int battery_get_current_state(
 	}
 	info.capacity = val;
 
-	path = BATTERY_ROOT_PATH"/battery/current_now";
+	path = BATTERY_ROOT_PATH"/rk-bat/current_now";
 	ret = sys_get_int(path, &val);
-	if (ret < 0) {
-		_E("Failed to get value of (%s, %d)", path, ret);
-		return ret;
+	if (ret == 0)
+		info.current_now = val;
+	else {
+		if (strncmp(power_source, POWER_SOURCE_NONE, sizeof(POWER_SOURCE_NONE)))
+			info.current_now = 1000; /* current entering the battery from charge source */
+		else
+			info.current_now = -1000; /* current discharging from the battery */
 	}
-	info.current_now = val;
 
-	path = BATTERY_ROOT_PATH"/battery/current_avg";
+	path = BATTERY_ROOT_PATH"/rk-bat/current_avg";
 	ret = sys_get_int(path, &val);
-	if (ret < 0) {
-		_E("Failed to get value of (%s, %d)", path, ret);
-		return ret;
-	}
-	info.current_average = val;
+	if (ret == 0)
+		info.current_average = val;
+	else
+		info.current_average = info.current_now;
 
 	updated_cb(&info, data);
 

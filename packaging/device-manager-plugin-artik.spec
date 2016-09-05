@@ -12,6 +12,7 @@ BuildRequires:  cmake
 BuildRequires:  pkgconfig(dlog)
 BuildRequires:  pkgconfig(hwcommon)
 BuildRequires:  pkgconfig(glib-2.0)
+BuildRequires:  pkgconfig(libudev)
 
 %description
 Device manager plugin artik

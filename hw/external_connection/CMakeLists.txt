@@ -4,7 +4,7 @@ PROJECT(external_connection C)
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 
 INCLUDE(FindPkgConfig)
-pkg_check_modules(external_connection_pkgs REQUIRED hwcommon dlog glib-2.0)
+pkg_check_modules(external_connection_pkgs REQUIRED hwcommon dlog glib-2.0 libudev)
 
 FOREACH(flag ${external_connection_pkgs_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")

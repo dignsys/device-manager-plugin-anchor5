@@ -1,5 +1,5 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
-PROJECT(device-manager-exynos3250 C)
+PROJECT(device-manager-artik C)
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 
@@ -7,3 +7,4 @@ ADD_SUBDIRECTORY(hw/battery)
 ADD_SUBDIRECTORY(hw/display)
 ADD_SUBDIRECTORY(hw/external_connection)
 ADD_SUBDIRECTORY(hw/touchscreen)
+ADD_SUBDIRECTORY(hw/usb_gadget)

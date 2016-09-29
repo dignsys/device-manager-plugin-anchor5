@@ -460,13 +460,6 @@ static int legacy_set_gadget_strs(struct usb_gadget_strings *strs)
 			return ret;
 	}
 
-	if (strs->serial) {
-		ret = sys_set_str(LEGACY_ISERIAL_PATH,
-				  strs->serial);
-		if (ret)
-			return ret;
-	}
-
 	return ret;
 }
 

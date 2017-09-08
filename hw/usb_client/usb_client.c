@@ -565,7 +565,7 @@ static void legacy_free_gadget(struct usb_gadget *gadget)
 	if (!gadget)
 		return;
 
-		if (gadget->strs) {
+	if (gadget->strs) {
 		for (i = 0; gadget->strs[i].lang_code; ++i) {
 			free(gadget->strs[i].manufacturer);
 			free(gadget->strs[i].product);

@@ -40,7 +40,6 @@ static char *touchscreen_node;
 static int touchscreen_probe(void)
 {
 	DIR *d;
-	struct dirent entry;
 	struct dirent *dir;
 	char buf[PATH_MAX];
 	int val, ret = -ENOTSUP;
@@ -49,7 +48,7 @@ static int touchscreen_probe(void)
 	if (!d)
 		return -errno;
 
-	while (readdir_r(d, &entry, &dir) == 0 && dir != NULL) {
+	while ((dir = readdir(d))) {
 		if (dir->d_name[0] == '.')
 			continue;
 		snprintf(buf, sizeof(buf), "%s%s%s", INPUT_PATH,

@@ -172,7 +172,7 @@ static int legacy_alloc_config(int n_funcs, struct usb_configuration **_config)
 	if (!config->funcs)
 		goto free_strs;
 
-	/* 
+	/*
 	 * We cannot read correct values
 	 * so assume that they are always default
 	 */
@@ -444,7 +444,7 @@ static int legacy_set_gadget_strs(struct usb_gadget_strings *strs)
 	/*
 	 * TODO
 	 * Here is a good place to ensure that serial is immutable
-	 */	
+	 */
 
 	if (strs->manufacturer) {
 		ret = sys_set_str(LEGACY_IMANUFACTURER_PATH,
@@ -531,7 +531,7 @@ static int legacy_enable(struct usb_client *usb)
 static int legacy_disable(struct usb_client *usb)
 {
 	return sys_set_str(LEGACY_ENABLE_PATH,
-			   LEGACY_DISABLE);	
+			   LEGACY_DISABLE);
 }
 
 static void legacy_free_config(struct usb_configuration *config)

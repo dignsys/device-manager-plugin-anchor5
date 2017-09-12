@@ -57,7 +57,7 @@ static void remove_not_string(char *str)
 {
 	char *t = str;
 
-	while(*t != '\0') {
+	while (*t != '\0') {
 		if (*t == '\r' ||
 			*t == '\n' ||
 			*t == '\x0a')

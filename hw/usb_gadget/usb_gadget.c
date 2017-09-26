@@ -185,7 +185,7 @@ static int simple_id_to_gadget(struct usb_gadget_id *gadget_id,
 			       struct usb_gadget **_gadget)
 {
 	struct usb_gadget *gadget;
-	int n_configs;
+	unsigned int n_configs = 0;
 	/* zero terminates */
 	int functions[2][sizeof(gadget_id->function_mask)*8];
 	int n_functions;
@@ -285,7 +285,7 @@ static int simple_id_to_gadget(struct usb_gadget_id *gadget_id,
 		break;
 	};
 
-	if (n_configs > 2) {
+	if (n_configs > 2 || n_configs == 0) {
 		ret = -EINVAL;
 		goto free_gadget;
 	}

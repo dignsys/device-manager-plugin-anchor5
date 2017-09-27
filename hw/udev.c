@@ -29,7 +29,7 @@
 #define EVENT_KERNEL       "kernel"
 #define EVENT_UDEV         "udev"
 
-#define UDEV_MONITOR_SIZE   (10*1024)
+#define UDEV_MONITOR_SIZE   (128*1024)
 
 struct uevent_info {
 	struct udev_monitor *mon;
@@ -141,6 +141,7 @@ static int uevent_control_start(const char *type,
 		goto stop;
 	}
 
+	_I("Set udev monitor buffer size %d", UDEV_MONITOR_SIZE);
 	ret = udev_monitor_set_receive_buffer_size(info->mon,
 			UDEV_MONITOR_SIZE);
 	if (ret != 0) {

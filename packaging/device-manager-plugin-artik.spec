@@ -31,6 +31,9 @@ make %{?jobs:-j%jobs}
 %install
 %make_install
 
+# Remove unnecessary files
+rm -rf %{buildroot}%{_libdir}/hw/external_connection.so
+rm -rf %{buildroot}%{_libdir}/hw/battery.so
 
 %post
 /sbin/ldconfig
@@ -42,3 +45,4 @@ make %{?jobs:-j%jobs}
 %{_libdir}/hw/*.so
 %manifest %{name}.manifest
 %license LICENSE
+

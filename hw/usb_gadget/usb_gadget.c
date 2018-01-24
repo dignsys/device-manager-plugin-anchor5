@@ -30,7 +30,7 @@
 /* Based on slp-gadget and initial version of USB HAL by Taeyoung Kim */
 #define DEFAULT_VID 0x04e8
 #define DEFAULT_PID 0x6860
-#define DEFAULT_BCD_DEVICE 0xffff
+#define DEFAULT_BCD_DEVICE 0x0100
 
 #define DEFAULT_LANG 0x409 /* US_en */
 #define DEFAULT_MANUFACTURER "Samsung"

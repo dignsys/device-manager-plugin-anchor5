@@ -119,7 +119,7 @@ static int systemd_stop_service(const char *service_name)
 	return systemd_unit_interface("StopUnit", unit);
 }
 
-static int get_int_from_file(char *path, int *_val)
+static int get_int_from_file(char *path, int *_val, int base)
 {
 	char buf[INT_BUF_SIZE];
 	char *endptr;
@@ -130,7 +130,7 @@ static int get_int_from_file(char *path, int *_val)
 	if (ret)
 		return ret;
 
-	val = strtol(buf, &endptr, 0);
+	val = strtol(buf, &endptr, base);
 	if (val == LONG_MIN || val == LONG_MAX ||
 	    buf[0] == '\0' || (*endptr != '\0' && *endptr != '\n')
 	    || val > INT_MAX)
@@ -145,21 +145,21 @@ static int legacy_read_gadget_attrs_strs(struct usb_gadget *gadget)
 	int val;
 	int ret;
 	/* We assume that values received from kernel will be valid */
-#define GET_VALUE_FROM_SYSFS(path, field, type)		\
+#define GET_VALUE_FROM_SYSFS(path, field, type, base)	\
 	do {						\
-		ret = get_int_from_file(path, &val);	\
+		ret = get_int_from_file(path, &val, base);	\
 		if (ret)				\
 			return ret;			\
 							\
 		gadget->attrs.field = (type)val;	\
 	} while (0)
 
-	GET_VALUE_FROM_SYSFS(LEGACY_CLASS_PATH, bDeviceClass, uint8_t);
-	GET_VALUE_FROM_SYSFS(LEGACY_SUBCLASS_PATH, bDeviceSubClass, uint8_t);
-	GET_VALUE_FROM_SYSFS(LEGACY_PROTOCOL_PATH, bDeviceProtocol, uint8_t);
-	GET_VALUE_FROM_SYSFS(LEGACY_ID_VENDOR_PATH, idVendor, uint16_t);
-	GET_VALUE_FROM_SYSFS(LEGACY_ID_PRODUCT_PATH, idVendor, uint16_t);
-	GET_VALUE_FROM_SYSFS(LEGACY_BCD_DEVICE_PATH, bcdDevice, uint16_t);
+	GET_VALUE_FROM_SYSFS(LEGACY_CLASS_PATH, bDeviceClass, uint8_t, 0);
+	GET_VALUE_FROM_SYSFS(LEGACY_SUBCLASS_PATH, bDeviceSubClass, uint8_t, 0);
+	GET_VALUE_FROM_SYSFS(LEGACY_PROTOCOL_PATH, bDeviceProtocol, uint8_t, 0);
+	GET_VALUE_FROM_SYSFS(LEGACY_ID_VENDOR_PATH, idVendor, uint16_t, 16);
+	GET_VALUE_FROM_SYSFS(LEGACY_ID_PRODUCT_PATH, idProduct, uint16_t, 16);
+	GET_VALUE_FROM_SYSFS(LEGACY_BCD_DEVICE_PATH, bcdDevice, uint16_t, 0);
 #undef GET_VALUE_FROM_SYSFS
 
 #define GET_STRING_FROM_SYSFS(path, field)			\

@@ -23,7 +23,13 @@
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/mount.h>
 #include <usbg/usbg.h>
+#include <systemd/sd-bus.h>
+
+#include <unistd.h>
 
 #define zalloc(amount) calloc(1, amount)
 
@@ -34,6 +40,11 @@
 
 #define CONFIGFS_GADGET_NAME "hal-gadget"
 #define CONFIGFS_CONFIG_LABEL "hal-config"
+
+#define NAME_INSTANCE_SEP '.'
+#define MAX_INSTANCE_LEN 512
+
+#define USB_FUNCS_PATH "/dev/usb-funcs/"
 
 struct cfs_client {
 	struct usb_client client;
@@ -154,13 +165,41 @@ out:
 	return ret;
 }
 
+static bool cfs_match_func(struct usb_function *f,
+			 const char *name, const char *instance) {
+	if (strcmp(name, usbg_get_function_type_str(USBG_F_FFS))) {
+		/* Standard functions */
+		if (!strcmp(name, f->name) && !strcmp(instance, f->instance))
+			return true;
+	} else {
+		/* Function with service */
+		const char *sep, *fname, *finst;
+		int len;
+
+		sep = strchr(instance, NAME_INSTANCE_SEP);
+		if (!sep || strlen(sep + 1) < 1)
+			return false;
+
+		fname = instance;
+		len = sep - instance;
+		finst = sep + 1;
+
+		if (strlen(f->name) == len
+		    && !strncmp(f->name, fname, len)
+		    && !strcmp(f->instance, finst))
+			return true;
+	}
+
+	return false;
+}
+
+
 static int cfs_find_func(const char *name, const char *instance)
 {
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(_available_funcs); ++i)
-		if (!strcmp(name, _available_funcs[i]->name) &&
-		    !strcmp(instance, _available_funcs[i]->instance))
+		if (cfs_match_func(_available_funcs[i], name, instance))
 			return i;
 
 	return -ENOENT;
@@ -219,9 +258,9 @@ static struct usb_function *cfs_find_func_in_gadget(
 	int i;
 
 	for (i = 0; gadget->funcs[i]; ++i)
-		if (!strcmp(name, gadget->funcs[i]->name)
-		    && !strcmp(instance, gadget->funcs[i]->instance))
+		if (cfs_match_func(gadget->funcs[i], name, instance))
 			return gadget->funcs[i];
+
 	return NULL;
 }
 
@@ -311,7 +350,7 @@ static int cfs_count_bindings(usbg_config *config)
 static int cfs_read_configs(usbg_gadget *gadget, struct usb_gadget *usb_gadget)
 {
 	usbg_config *config;
-	int i;
+	int i = 0;
 	int n_funcs;
 	int ret;
 
@@ -449,21 +488,23 @@ out:
 static bool cfs_is_function_supported(struct usb_client *usb,
 					 struct usb_function *func)
 {
+	bool res;
 	int ret;
 
-	/* for now only simple functions without userspace service */
-	if (func->function_group != USB_FUNCTION_GROUP_SIMPLE)
-		return false;
+	switch (func->function_group) {
+	case USB_FUNCTION_GROUP_SIMPLE:
+		ret = usbg_lookup_function_type(func->name);
+		res = ret >= 0;
+		break;
+	case USB_FUNCTION_GROUP_WITH_SERVICE:
+		/* TODO: Check if socket is available */
+		res = true;
+		break;
+	default:
+		res = false;
+	}
 
-	/*
-	 * TODO
-	 * Instead of only checking whether we know this function
-	 * we should also somehow check that it's realy available
-	 * in our kernel.
-	 */
-	ret = usbg_lookup_function_type(func->name);
-
-	return ret > 0;
+	return res;
 }
 
 static bool cfs_is_gadget_supported(struct usb_client *usb,
@@ -545,6 +586,195 @@ static int cfs_set_gadget_strs(struct cfs_client *cfs_client,
 	return ret;
 }
 
+#define SYSTEMD_DBUS_SERVICE "org.freedesktop.systemd1"
+#define SYSTEMD_DBUS_PATH "/org/freedesktop/systemd1"
+#define SYSTEMD_DBUS_MANAGER_IFACE "org.freedesktop.systemd1.Manager"
+
+#define SYSTEMD_SOCKET_SUFFIX ".socket"
+#define MAX_SOCKET_NAME 1024
+
+struct bus_ctx {
+	const char *unit;
+	sd_event *loop;
+};
+
+static int socket_started(sd_bus_message *m, void *userdata,
+			  sd_bus_error *ret_error)
+{
+	struct bus_ctx *ctx = userdata;
+	char *signal_unit;
+	int ret;
+
+	ret = sd_bus_message_read(m, "uoss", NULL, NULL, &signal_unit, NULL);
+	if (ret < 0) {
+		sd_event_exit(ctx->loop, ret);
+		return 0;
+	}
+
+	if (!strcmp(signal_unit, ctx->unit))
+		sd_event_exit(ctx->loop, 0);
+
+	return 0;
+}
+
+static int systemd_unit_interface_sync(const char *method, const char *unit,
+				       bool wait)
+{
+	sd_bus *bus = NULL;
+	sd_event *loop = NULL;
+	struct bus_ctx ctx;
+	int ret;
+
+	ret = sd_bus_open_system(&bus);
+	if (ret < 0)
+		return ret;
+
+	if (wait) {
+		ret = sd_event_new(&loop);
+		if (ret < 0)
+			goto unref_bus;
+
+		ctx.loop = loop;
+		ctx.unit = unit;
+
+		ret = sd_bus_attach_event(bus, loop, SD_EVENT_PRIORITY_NORMAL);
+		if (ret < 0)
+			goto unref_loop;
+
+		ret = sd_bus_add_match(bus, NULL,
+				       "type='signal',"
+				       "sender='" SYSTEMD_DBUS_SERVICE "',"
+				       "interface='" SYSTEMD_DBUS_MANAGER_IFACE "',"
+				       "member='JobRemoved',"
+				       "path_namespace='" SYSTEMD_DBUS_PATH "'",
+				       socket_started,
+				       &ctx);
+		if (ret < 0)
+			goto unref_loop;
+	}
+
+
+	ret = sd_bus_call_method(bus,
+			SYSTEMD_DBUS_SERVICE,
+			SYSTEMD_DBUS_PATH,
+			SYSTEMD_DBUS_MANAGER_IFACE,
+			method,
+			NULL,
+			NULL,
+			"ss",
+			unit,
+			"replace");
+	if (ret < 0)
+		goto unref_loop;
+
+	if (wait)
+		ret = sd_event_loop(loop);
+
+unref_loop:
+	if (wait)
+		sd_event_unref(loop);
+unref_bus:
+	sd_bus_unref(bus);
+	return ret;
+}
+
+static int systemd_start_socket(const char *socket_name)
+{
+	char unit[MAX_SOCKET_NAME];
+	int ret;
+
+	ret = snprintf(unit, sizeof(unit), "%s" SYSTEMD_SOCKET_SUFFIX,
+		       socket_name);
+	if (ret < 0 || ret >= sizeof(unit))
+		return -ENAMETOOLONG;
+
+
+	return systemd_unit_interface_sync("StartUnit", unit, true);
+}
+
+static int systemd_stop_socket(const char *socket_name)
+{
+	char unit[MAX_SOCKET_NAME];
+	int ret;
+
+	ret = snprintf(unit, sizeof(unit), "%s" SYSTEMD_SOCKET_SUFFIX,
+		       socket_name);
+	if (ret < 0 || ret >= sizeof(unit))
+		return -ENAMETOOLONG;
+
+	return systemd_unit_interface_sync("StopUnit", unit, false);
+}
+
+static int cfs_ensure_dir(char *path)
+{
+	int ret;
+
+	ret = mkdir(path, 0770);
+	if (ret < 0)
+		ret = errno == EEXIST ? 0 : errno;
+
+	return ret;
+}
+
+static int cfs_prep_ffs_service(const char *name, const char *instance,
+				const char *dev_name, const char *socket_name)
+{
+	char buf[PATH_MAX];
+	size_t left;
+	char *pos;
+	int ret;
+
+	/* TODO: Add some good error handling */
+
+	left = sizeof(buf);
+	pos = buf;
+	ret = snprintf(pos, left, "%s", USB_FUNCS_PATH);
+	if (ret < 0 || ret >= left) {
+		return -ENAMETOOLONG;
+	} else {
+		left -= ret;
+		pos += ret;
+	}
+	ret = cfs_ensure_dir(buf);
+	if (ret < 0)
+		return ret;
+
+	ret = snprintf(pos, left, "/%s", name);
+	if (ret < 0 || ret >= left) {
+		return -ENAMETOOLONG;
+	} else {
+		left -= ret;
+		pos += ret;
+	}
+	ret = cfs_ensure_dir(buf);
+	if (ret < 0)
+		return ret;
+
+	ret = snprintf(pos, left, "/%s", instance);
+	if (ret < 0 || ret >= left) {
+		return -ENAMETOOLONG;
+	} else {
+		left -= ret;
+		pos += ret;
+	}
+	ret = cfs_ensure_dir(buf);
+	if (ret < 0)
+		return ret;
+
+	ret = mount(dev_name, buf, "functionfs", 0, NULL);
+	if (ret < 0)
+		return ret;
+
+	ret = systemd_start_socket(socket_name);
+	if (ret < 0)
+		goto umount_ffs;
+
+	return 0;
+umount_ffs:
+	umount(buf);
+	return ret;
+}
+
 static int cfs_set_gadget_config(struct cfs_client *cfs_client,
 				    int config_id,
 				    struct usb_configuration *usb_config)
@@ -581,18 +811,54 @@ static int cfs_set_gadget_config(struct cfs_client *cfs_client,
 
 	for (i = 0; usb_config->funcs && usb_config->funcs[i]; ++i) {
 		struct usb_function *usb_func = usb_config->funcs[i];
-		int type = usbg_lookup_function_type(usb_func->name);
+		char instance[MAX_INSTANCE_LEN];
+		int type;
 		usbg_function *func;
 
-		func = usbg_get_function(cfs_client->gadget,
-					 type, usb_func->instance);
+		switch (usb_func->function_group) {
+		case USB_FUNCTION_GROUP_SIMPLE:
+			type = usbg_lookup_function_type(usb_func->name);
+			if (strlen(usb_func->instance) >= MAX_INSTANCE_LEN)
+				return -ENAMETOOLONG;
+			strcpy(instance, usb_func->instance);
+			break;
+		case USB_FUNCTION_GROUP_WITH_SERVICE:
+			type = USBG_F_FFS;
+			ret = snprintf(instance, sizeof(instance), "%s%c%s",
+				       usb_func->name, NAME_INSTANCE_SEP,
+				       usb_func->instance);
+			if (ret < 0 || ret >= sizeof(instance))
+				return -ENAMETOOLONG;
+			break;
+		default:
+			return -EINVAL;
+		}
+
+
+		func = usbg_get_function(cfs_client->gadget, type, instance);
 		if (!func) {
 			ret = usbg_create_function(cfs_client->gadget,
 						   type,
-						   usb_func->instance,
+						   instance,
 						   NULL, &func);
 			if (ret)
 				return ret;
+
+			if (usb_func->function_group ==
+			    USB_FUNCTION_GROUP_WITH_SERVICE) {
+				struct usb_function_with_service *fws;
+
+				fws = container_of(usb_func,
+						   struct usb_function_with_service,
+						   func);
+				ret = cfs_prep_ffs_service(usb_func->name,
+							   usb_func->instance,
+							   instance,
+							   fws->service);
+				if (ret)
+					return ret;
+			}
+
 		}
 
 		ret = usbg_add_config_function(config, NULL, func);

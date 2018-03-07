@@ -4,7 +4,7 @@ PROJECT(usb_client C)
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 
 INCLUDE(FindPkgConfig)
-pkg_check_modules(usb_client_pkgs REQUIRED hwcommon dlog glib-2.0)
+pkg_check_modules(usb_client_pkgs REQUIRED hwcommon dlog glib-2.0 libusbgx)
 
 FOREACH(flag ${usb_client_pkgs_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")
@@ -13,7 +13,7 @@ ENDFOREACH(flag)
 SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} -fvisibility=hidden")
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${EXTRA_CFLAGS}")
 
-ADD_LIBRARY(${PROJECT_NAME} MODULE usb_client.c ../shared.c)
+ADD_LIBRARY(${PROJECT_NAME} MODULE usb_client_configfs.c ../shared.c)
 TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${usb_client_pkgs_LDFLAGS})
 SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES PREFIX "")
 INSTALL(TARGETS ${PROJECT_NAME} DESTINATION ${LIB_INSTALL_DIR}/hw COMPONENT RuntimeLibraries)

@@ -14,6 +14,7 @@ BuildRequires:  pkgconfig(hwcommon)
 BuildRequires:  pkgconfig(glib-2.0)
 BuildRequires:  pkgconfig(libudev)
 BuildRequires:  pkgconfig(capi-system-peripheral-io)
+BuildRequires:  pkgconfig(libusbgx)
 
 %description
 Device manager plugin artik

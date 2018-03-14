@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include <sys/mount.h>
 #include <usbg/usbg.h>
+#include <unistd.h>
 #include <systemd/sd-bus.h>
 
 #include <unistd.h>
@@ -964,6 +965,10 @@ static int cfs_gadget_open(struct hw_info *info,
 	if (!info || !common)
 		return -EINVAL;
 
+	/* used exclusively with slp usb_client*/
+	if (!access("/sys/class/usb_mode/usb0/enable", F_OK))
+		return -ENOENT;
+
 	cfs_client = zalloc(sizeof(*cfs_client));
 	if (!cfs_client)
 		return -ENOMEM;
@@ -1030,7 +1035,7 @@ HARDWARE_MODULE_STRUCTURE = {
 	.magic = HARDWARE_INFO_TAG,
 	.hal_version = HARDWARE_INFO_VERSION,
 	.device_version = USB_CLIENT_HARDWARE_DEVICE_VERSION,
-	.id = USB_CLIENT_HARDWARE_DEVICE_ID,
+	.id = USB_CFS_CLIENT_HARDWARE_DEVICE_ID,
 	.name = "cfs-gadget",
 	.open = cfs_gadget_open,
 	.close = cfs_gadget_close,

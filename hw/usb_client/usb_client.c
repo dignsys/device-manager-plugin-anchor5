@@ -23,6 +23,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include <systemd/sd-bus.h>
 
 #define zalloc(amount) calloc(1, amount)
@@ -714,6 +715,10 @@ static int legacy_gadget_open(struct hw_info *info,
 
 	if (!info || !common)
 		return -EINVAL;
+
+	/* check if slp usb gadget exists */
+	if (access("/sys/class/usb_mode/usb0/enable", F_OK))
+		return -ENOENT;
 
 	legacy = zalloc(sizeof(*legacy));
 	if (!legacy)

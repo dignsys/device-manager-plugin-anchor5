@@ -1,0 +1,19 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+PROJECT(usb_cfs_client C)
+
+SET(PREFIX ${CMAKE_INSTALL_PREFIX})
+
+INCLUDE(FindPkgConfig)
+pkg_check_modules(usb_cfs_client_pkgs REQUIRED hwcommon dlog glib-2.0 libsystemd libusbgx)
+
+FOREACH(flag ${usb_cfs_client_pkgs_CFLAGS})
+	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")
+ENDFOREACH(flag)
+
+SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} -fvisibility=hidden")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${EXTRA_CFLAGS}")
+
+ADD_LIBRARY(${PROJECT_NAME} MODULE usb_cfs_client.c ../shared.c)
+TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${usb_cfs_client_pkgs_LDFLAGS})
+SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES PREFIX "")
+INSTALL(TARGETS ${PROJECT_NAME} DESTINATION ${LIB_INSTALL_DIR}/hw COMPONENT RuntimeLibraries)

@@ -16,6 +16,7 @@ BuildRequires:  pkgconfig(libudev)
 BuildRequires:  pkgconfig(capi-system-peripheral-io)
 BuildRequires:  pkgconfig(libusbgx)
 BuildRequires:  pkgconfig(libsystemd)
+BuildRequires:  pkgconfig(libusbgx)
 
 %description
 Device manager plugin artik

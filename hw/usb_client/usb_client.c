@@ -289,9 +289,12 @@ static int legacy_read_config(struct usb_gadget *gadget,
 
 	/* count number of functions in this config */
 	f_cnt = 1;
-	for (i = 0; buf[i] != '\0'; ++i)
+	for (i = 0; buf[i] != '\0'; ++i) {
 		if (buf[i] == sep[0])
 			++f_cnt;
+		if (buf[i] == '\n')  /* buf ends with it */
+			buf[i] = 0;
+	}
 
 	ret = legacy_alloc_config(f_cnt, &config);
 	if (ret)
@@ -305,7 +308,7 @@ static int legacy_read_config(struct usb_gadget *gadget,
 		if (!func) {
 			/* new function not added yet to gadget */
 			ret = legacy_alloc_new_func(gadget, fname, &func);
-			if (!ret)
+			if (ret)
 				goto free_config;
 		}
 

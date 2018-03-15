@@ -278,6 +278,7 @@ static int legacy_read_config(struct usb_gadget *gadget,
 	char *sep = LEGACY_FUNC_SEP;
 	int i, f_cnt;
 	int f_idx;
+	int g_f_idx;
 	int ret;
 
 	ret = sys_get_str(cpath, buf, sizeof(buf));
@@ -301,6 +302,8 @@ static int legacy_read_config(struct usb_gadget *gadget,
 	if (ret)
 		return ret;
 
+	for (g_f_idx = 0; gadget->funcs[g_f_idx]; ++g_f_idx);
+
 	f_idx = 0;
 	for (fname = strsep(&begin, sep); fname; fname = strsep(&begin, sep)) {
 		struct usb_function *func;
@@ -311,6 +314,8 @@ static int legacy_read_config(struct usb_gadget *gadget,
 			ret = legacy_alloc_new_func(gadget, fname, &func);
 			if (ret)
 				goto free_config;
+
+			gadget->funcs[g_f_idx++] = func;
 		}
 
 		config->funcs[f_idx++] = func;

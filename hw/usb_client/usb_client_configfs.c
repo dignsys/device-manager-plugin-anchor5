@@ -375,7 +375,7 @@ free_current:
 	free(usb_gadget->configs[i]);
 clean_prev:
 	while (i >= 0)
-		cfs_free_config(usb_gadget->configs[i]);
+		cfs_free_config(usb_gadget->configs[i--]);
 	return ret;
 }
 
@@ -473,9 +473,9 @@ free_funcs:
 	free(usb_funcs);
 free_strs_with_content:
 	for (i = 0; usb_gadget->strs[i].lang_code; ++i) {
-		free(usb_gadget->strs[0].manufacturer);
-		free(usb_gadget->strs[0].product);
-		free(usb_gadget->strs[0].serial);
+		free(usb_gadget->strs[i].manufacturer);
+		free(usb_gadget->strs[i].product);
+		free(usb_gadget->strs[i].serial);
 	}
 free_strs:
 	free(usb_gadget->strs);
@@ -820,7 +820,8 @@ static int cfs_set_gadget_config(struct cfs_client *cfs_client,
 			type = usbg_lookup_function_type(usb_func->name);
 			if (strlen(usb_func->instance) >= MAX_INSTANCE_LEN)
 				return -ENAMETOOLONG;
-			strcpy(instance, usb_func->instance);
+			strncpy(instance, usb_func->instance, MAX_INSTANCE_LEN);
+			instance[MAX_INSTANCE_LEN - 1] = '\0';
 			break;
 		case USB_FUNCTION_GROUP_WITH_SERVICE:
 			type = USBG_F_FFS;

@@ -23,6 +23,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
+#include <systemd/sd-bus.h>
 
 #define zalloc(amount) calloc(1, amount)
 
@@ -60,6 +61,63 @@
 
 /* +5 to be always big enough */
 #define INT_BUF_SIZE (sizeof(int)*8 + 5)
+
+#define SYSTEMD_DBUS_SERVICE "org.freedesktop.systemd1"
+#define SYSTEMD_DBUS_PATH "/org/freedesktop/systemd1"
+#define SYSTEMD_DBUS_MANAGER_IFACE "org.freedesktop.systemd1.Manager"
+
+#define SYSTEMD_SERVICE_SUFFIX ".service"
+#define MAX_SERVICE_NAME 1024
+
+static int systemd_unit_interface(const char *method, const char *unit)
+{
+	sd_bus *bus = NULL;
+	int r;
+
+	r = sd_bus_open_system(&bus);
+	if (r < 0)
+		return r;
+
+	r = sd_bus_call_method(bus,
+			SYSTEMD_DBUS_SERVICE,
+			SYSTEMD_DBUS_PATH,
+			SYSTEMD_DBUS_MANAGER_IFACE,
+			method,
+			NULL,
+			NULL,
+			"ss",
+			unit,
+			"replace");
+
+	sd_bus_unref(bus);
+	return r;
+}
+
+static int systemd_start_service(const char *service_name)
+{
+	char unit[MAX_SERVICE_NAME];
+	int ret;
+
+	ret = snprintf(unit, sizeof(unit), "%s" SYSTEMD_SERVICE_SUFFIX,
+		       service_name);
+	if (ret < 0 || ret >= sizeof(unit))
+		return -ENAMETOOLONG;
+
+	return systemd_unit_interface("StartUnit", unit);
+}
+
+static int systemd_stop_service(const char *service_name)
+{
+	char unit[MAX_SERVICE_NAME];
+	int ret;
+
+	ret = snprintf(unit, sizeof(unit), "%s" SYSTEMD_SERVICE_SUFFIX,
+		       service_name);
+	if (ret < 0 || ret >= sizeof(unit))
+		return -ENAMETOOLONG;
+
+	return systemd_unit_interface("StopUnit", unit);
+}
 
 static int get_int_from_file(char *path, int *_val)
 {
@@ -524,14 +582,71 @@ static int legacy_reconfigure_gadget(struct usb_client *usb,
 
 static int legacy_enable(struct usb_client *usb)
 {
-	return sys_set_str(LEGACY_ENABLE_PATH,
+	int ret;
+	int i;
+	struct usb_gadget *gadget;
+	struct usb_function_with_service *fws;
+
+	ret = sys_set_str(LEGACY_ENABLE_PATH,
 			   LEGACY_ENABLE);
+	if (ret < 0)
+		return ret;
+
+	ret = legacy_get_current_gadget(usb, &gadget);
+	if (ret < 0)
+		goto disable_gadget;
+
+	for (i = 0; gadget->funcs[i]; ++i) {
+		if (gadget->funcs[i]->function_group !=
+		    USB_FUNCTION_GROUP_WITH_SERVICE)
+			continue;
+
+		fws = container_of(gadget->funcs[i],
+				   struct usb_function_with_service, func);
+		ret = systemd_start_service(fws->service);
+		if (ret < 0)
+			goto stop_services;
+	}
+
+	return 0;
+stop_services:
+	while (--i >= 0) {
+		if (gadget->funcs[i]->function_group !=
+		    USB_FUNCTION_GROUP_WITH_SERVICE)
+			continue;
+
+		fws = container_of(gadget->funcs[i],
+				   struct usb_function_with_service, func);
+		systemd_stop_service(fws->service);
+	}
+
+disable_gadget:
+	sys_set_str(LEGACY_ENABLE_PATH, LEGACY_DISABLE);
+	return ret;
 }
 
 static int legacy_disable(struct usb_client *usb)
 {
-	return sys_set_str(LEGACY_ENABLE_PATH,
-			   LEGACY_DISABLE);
+	int ret;
+	int i;
+	struct usb_gadget *gadget;
+	struct usb_function_with_service *fws;
+
+	ret = legacy_get_current_gadget(usb, &gadget);
+	if (ret < 0)
+		return ret;
+
+	for (i = 0; gadget->funcs[i]; ++i) {
+		if (gadget->funcs[i]->function_group != USB_FUNCTION_GROUP_WITH_SERVICE)
+			continue;
+
+		fws = container_of(gadget->funcs[i], struct usb_function_with_service, func);
+		ret = systemd_stop_service(fws->service);
+		if (ret < 0)
+			return ret;
+	}
+
+	return sys_set_str(LEGACY_ENABLE_PATH, LEGACY_DISABLE);
 }
 
 static void legacy_free_config(struct usb_configuration *config)
@@ -565,7 +680,7 @@ static void legacy_free_gadget(struct usb_gadget *gadget)
 	if (!gadget)
 		return;
 
-		if (gadget->strs) {
+	if (gadget->strs) {
 		for (i = 0; gadget->strs[i].lang_code; ++i) {
 			free(gadget->strs[i].manufacturer);
 			free(gadget->strs[i].product);

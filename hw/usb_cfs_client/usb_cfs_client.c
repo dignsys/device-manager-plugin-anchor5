@@ -731,44 +731,57 @@ static int cfs_prep_ffs_service(const char *name, const char *instance,
 	pos = buf;
 	ret = snprintf(pos, left, "%s", USB_FUNCS_PATH);
 	if (ret < 0 || ret >= left) {
+		_E("Function path too long");
 		return -ENAMETOOLONG;
 	} else {
 		left -= ret;
 		pos += ret;
 	}
 	ret = cfs_ensure_dir(buf);
-	if (ret < 0)
+	if (ret < 0) {
+		_E("Could not create directory %s", buf);
 		return ret;
+	}
 
 	ret = snprintf(pos, left, "/%s", name);
 	if (ret < 0 || ret >= left) {
+		_E("Path too long");
 		return -ENAMETOOLONG;
 	} else {
 		left -= ret;
 		pos += ret;
 	}
 	ret = cfs_ensure_dir(buf);
-	if (ret < 0)
+	if (ret < 0) {
+		_E("Could not create directory %s", buf);
 		return ret;
+	}
 
 	ret = snprintf(pos, left, "/%s", instance);
 	if (ret < 0 || ret >= left) {
+		_E("Path too long");
 		return -ENAMETOOLONG;
 	} else {
 		left -= ret;
 		pos += ret;
 	}
 	ret = cfs_ensure_dir(buf);
-	if (ret < 0)
+	if (ret < 0) {
+		_E("Could not create directory %s", buf);
 		return ret;
+	}
 
 	ret = mount(dev_name, buf, "functionfs", 0, NULL);
-	if (ret < 0)
+	if (ret < 0) {
+		_E("Could not mount %s: %m", dev_name);
 		return ret;
+	}
 
 	ret = systemd_start_socket(socket_name);
-	if (ret < 0)
+	if (ret < 0) {
+		_E("Could not start socket: %d", ret);
 		goto umount_ffs;
+	}
 
 	return 0;
 umount_ffs:
@@ -794,20 +807,26 @@ static int cfs_set_gadget_config(struct cfs_client *cfs_client,
 	config = usbg_get_config(cfs_client->gadget, config_id, NULL);
 	if (config) {
 		ret = usbg_rm_config(config, USBG_RM_RECURSE);
-		if (ret)
+		if (ret) {
+			_E("Could not remove config %d", config_id);
 			return ret;
+		}
 	}
 
 	ret = usbg_create_config(cfs_client->gadget, config_id,
 				 CONFIGFS_CONFIG_LABEL, &cattrs, NULL, &config);
-	if (ret)
+	if (ret) {
+		_E("Could not create config %d", config_id);
 		return ret;
+	}
 
 	for (i = 0; usb_config->strs && usb_config->strs[i].lang_code; ++i) {
 		ret = usbg_set_config_string(config, usb_config->strs[i].lang_code,
 					     usb_config->strs[i].config_str);
-		if (ret)
+		if (ret) {
+			_E("Could not set config string");
 			return ret;
+		}
 	}
 
 	for (i = 0; usb_config->funcs && usb_config->funcs[i]; ++i) {
@@ -818,6 +837,7 @@ static int cfs_set_gadget_config(struct cfs_client *cfs_client,
 
 		switch (usb_func->function_group) {
 		case USB_FUNCTION_GROUP_SIMPLE:
+			_I("Adding simple function %s.%s", usb_func->name, usb_func->instance);
 			type = usbg_lookup_function_type(usb_func->name);
 			if (strlen(usb_func->instance) >= MAX_INSTANCE_LEN)
 				return -ENAMETOOLONG;
@@ -825,6 +845,7 @@ static int cfs_set_gadget_config(struct cfs_client *cfs_client,
 			instance[MAX_INSTANCE_LEN - 1] = '\0';
 			break;
 		case USB_FUNCTION_GROUP_WITH_SERVICE:
+			_I("Adding function %s.%s with service", usb_func->name, usb_func->instance);
 			type = USBG_F_FFS;
 			ret = snprintf(instance, sizeof(instance), "%s%c%s",
 				       usb_func->name, NAME_INSTANCE_SEP,
@@ -843,8 +864,10 @@ static int cfs_set_gadget_config(struct cfs_client *cfs_client,
 						   type,
 						   instance,
 						   NULL, &func);
-			if (ret)
+			if (ret) {
+				_E("Could not create function %d %s: %d", type, instance, ret);
 				return ret;
+			}
 
 			if (usb_func->function_group ==
 			    USB_FUNCTION_GROUP_WITH_SERVICE) {
@@ -857,15 +880,19 @@ static int cfs_set_gadget_config(struct cfs_client *cfs_client,
 							   usb_func->instance,
 							   instance,
 							   fws->service);
-				if (ret)
+				if (ret) {
+					_E("Could not prepare ffs servicef for %s.%s", type, instance);
 					return ret;
+				}
 			}
 
 		}
 
 		ret = usbg_add_config_function(config, NULL, func);
-		if (ret)
+		if (ret) {
+			_E("Could not add function to config");
 			return ret;
+		}
 	}
 
 	return ret;
@@ -963,6 +990,8 @@ static int cfs_gadget_open(struct hw_info *info,
 	struct cfs_client *cfs_client;
 	int ret;
 
+	_I("Opening configfs gadget");
+
 	if (!info || !common)
 		return -EINVAL;
 
@@ -975,11 +1004,14 @@ static int cfs_gadget_open(struct hw_info *info,
 		return -ENOMEM;
 
 	ret = usbg_init(CONFIGFS_PATH, &cfs_client->ctx);
-	if (ret)
+	if (ret) {
+		_E("Could not init usbg");
 		goto err_usbg_init;
+	}
 
 	cfs_client->udc = usbg_get_first_udc(cfs_client->ctx);
 	if (!cfs_client->udc) {
+		_E("No UDC found by usbg");
 		ret = -ENODEV;
 		goto err_no_udc;
 	}
@@ -987,8 +1019,12 @@ static int cfs_gadget_open(struct hw_info *info,
 	ret = usbg_create_gadget(cfs_client->ctx, CONFIGFS_GADGET_NAME,
 				 &default_g_attrs, &default_g_strs,
 				 &cfs_client->gadget);
-	if (ret)
+	if (ret) {
+		_E("Could not create gadget");
 		goto err_create_gadget;
+	}
+
+	_I("Gadget created");
 
 	cfs_client->client.common.info = info;
 	cfs_client->client.get_current_gadget = cfs_get_current_gadget;

@@ -949,6 +949,13 @@ static int cfs_reconfigure_gadget(struct usb_client *usb,
 			goto out;
 	}
 
+	/* Workaround for enabling extcon notification on artik */
+	ret = usbg_enable_gadget(cfs_client->gadget, cfs_client->udc);
+	if (ret) {
+		_E("Could not enable gadget");
+		goto out;
+	}
+
 	ret = cfs_cleanup_left_configs(cfs_client, i);
 
 	/* TODO

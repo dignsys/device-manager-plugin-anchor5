@@ -231,7 +231,7 @@ static int simple_id_to_gadget(struct usb_gadget_id *gadget_id,
 		functions[0][0] = USB_FUNCTION_ACM;
 		functions[0][1] = USB_FUNCTION_SDB;
 		functions[0][2] = 0;
-		gadget->attrs.idProduct = 0x6866;
+		gadget->attrs.idProduct = 0x6860;
 		break;
 	case USB_FUNCTION_MTP | USB_FUNCTION_ACM | USB_FUNCTION_SDB:
 		n_configs = 1;

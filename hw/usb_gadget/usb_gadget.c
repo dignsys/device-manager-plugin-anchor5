@@ -20,6 +20,7 @@
 
 #include <hw/usb_gadget.h>
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
@@ -122,11 +123,36 @@ out:
 	return -ENOMEM;
 }
 
+#define SERIAL_FILE_PATH "/sys/firmware/devicetree/base/serial-number"
+#define LINE_LEN 64
+
+static int get_device_serial(char **out)
+{
+	FILE *fp;
+	char *line, *p;
+
+	fp = fopen(SERIAL_FILE_PATH, "r");
+	if (!fp)
+		return -1;
+
+	line = malloc(LINE_LEN);
+	p = fgets(line, LINE_LEN, fp);
+	fclose(fp);
+	if (p == NULL) {
+		free(line);
+		return -1;
+	}
+
+	*out = p;
+	return 0;
+}
+
 static int alloc_default_gadget(struct usb_gadget **_gadget)
 {
 	struct usb_gadget *gadget;
 	struct usb_gadget_strings *strs;
 	struct usb_configuration **configs;
+	int ret;
 
 	gadget = zalloc(sizeof(*gadget));
 	if (!gadget)
@@ -143,7 +169,9 @@ static int alloc_default_gadget(struct usb_gadget **_gadget)
 	strs[0].lang_code = 0x409;
 	strs[0].manufacturer = strdup(DEFAULT_MANUFACTURER);
 	strs[0].product = strdup(DEFAULT_PRODUCT);
-	strs[0].serial = strdup(DEFAULT_SERIAL);
+	ret = get_device_serial(&strs[0].serial);
+	if (ret < 0)
+		strs[0].serial = strdup(DEFAULT_SERIAL);
 
 	if (!strs[0].manufacturer || !strs[0].product || !strs[0].serial)
 		goto free_strs;

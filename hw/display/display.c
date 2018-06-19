@@ -31,6 +31,10 @@
 #define BACKLIGHT_PATH  "/sys/class/backlight/s6e8fa0"
 #endif
 
+#ifndef LCD_PATH
+#define LCD_PATH  "/sys/class/drm/card0"
+#endif
+
 #define MAX_BRIGHTNESS_TEMP 100
 
 static int brightness_temp;
@@ -100,6 +104,56 @@ static int display_set_brightness(int brightness)
 	return 0;
 }
 
+static int display_get_state(enum display_state *state)
+{
+	int r;
+	char status[64];
+
+	// PANEL
+	r = sys_get_str(LCD_PATH"/card0-DSI-1/enabled", status, sizeof(status));
+	if (r < 0) {
+		_E("fail to get panel (errno:%d)", r);
+		return r;
+	}
+
+	if (!strncmp(status, "enabled", 7)) {
+		r = sys_get_str(LCD_PATH"/card0-DSI-1/dpms", status, sizeof(status));
+		if (r < 0) {
+			_E("fail to get state (errno:%d)", r);
+			return r;
+		}
+		goto out;
+	}
+
+	//HDMI
+	r = sys_get_str(LCD_PATH"/card0-HDMI-A-1/enabled", status, sizeof(status));
+	if (r < 0) {
+		_E("fail to get hdmi (errno:%d)", r);
+		return r;
+	}
+
+	if (!strncmp(status, "enabled", 7)) {
+		r = sys_get_str(LCD_PATH"/card0-HDMI-A-1/dpms", status, sizeof(status));
+		if (r < 0) {
+			_E("fail to get state (errno:%d)", r);
+			return r;
+		}
+	}
+
+	//Add here for more LCD device
+
+out:
+	//remap LCD state
+	if (!strncmp(status, "On", 2)) {
+		*state = DISPLAY_ON;
+	} else if (!strncmp(status, "Off", 3)) {
+		*state = DISPLAY_OFF;
+	} else
+		*state = -EINVAL;
+
+	return 0;
+}
+
 static int display_open(struct hw_info *info,
 		const char *id, struct hw_common **common)
 {
@@ -116,6 +170,7 @@ static int display_open(struct hw_info *info,
 	display_dev->get_max_brightness = display_get_max_brightness;
 	display_dev->get_brightness = display_get_brightness;
 	display_dev->set_brightness = display_set_brightness;
+	display_dev->get_state = display_get_state;
 
 	*common = (struct hw_common *)display_dev;
 	return 0;

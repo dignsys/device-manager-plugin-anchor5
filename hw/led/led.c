@@ -73,7 +73,10 @@ static uint8_t off_cmd[4] = { SET_CMD_CODE, 0x00, 0x00, 0x00 };
 
 static void blinkm_led_stop_script(peripheral_i2c_h handle)
 {
-	peripheral_i2c_write_byte(handle, STOP_SCRIPT_CMD);
+	uint8_t data[1] = {STOP_SCRIPT_CMD};
+	uint32_t length = 1;
+
+	peripheral_i2c_write(handle, data, length);
 }
 
 /**

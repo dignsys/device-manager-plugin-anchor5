@@ -1,0 +1,12 @@
+Code-Review+1: Security_Auto <avas.swc@samsung.com>
+Code-Review+1: CodingRule_Auto <seinfra@samsung.com>
+Code-Review+1: ASanBuild_Auto <asanbuild@samsung.com>
+Code-Review+1: BuildBreak_Auto <codehelp@samsung.com>
+Code-Review+1: SA_Auto <sa.swc@samsung.com>
+Code-Review+2: Hyotaek Shim <hyotaek.shim@samsung.com>
+Verified+1: Hyotaek Shim <hyotaek.shim@samsung.com>
+Submitted-by: Hyotaek Shim <hyotaek.shim@samsung.com>
+Submitted-at: Wed, 27 Jun 2018 23:55:23 +0000
+Reviewed-on: https://review.tizen.org/gerrit/182660
+Project: platform/adaptation/samsung_exynos/device-manager-plugin-artik
+Branch: refs/heads/tizen

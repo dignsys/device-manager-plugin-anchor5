@@ -25,7 +25,7 @@
 #include <dirent.h>
 
 #include <hw/external_connection.h>
-#include "../shared.h"
+#include <hw/shared.h>
 #include "../udev.h"
 
 #define SWITCH_ROOT_PATH "/sys/devices/virtual/switch"

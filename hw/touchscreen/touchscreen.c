@@ -25,7 +25,7 @@
 #include <dirent.h>
 
 #include <hw/touchscreen.h>
-#include "../shared.h"
+#include <hw/shared.h>
 
 #define INPUT_PATH      "/sys/class/input/"
 #define KEY_CAPABILITIES_PATH  "/device/capabilities/key"

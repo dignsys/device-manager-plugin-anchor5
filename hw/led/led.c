@@ -21,7 +21,7 @@
 #include <glib.h>
 
 #include <hw/led.h>
-#include "../shared.h"
+#include <hw/shared.h>
 
 #include <peripheral_io.h>
 

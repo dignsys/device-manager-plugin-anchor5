@@ -18,8 +18,7 @@
 
 #include <hw/usb_client.h>
 #include <hw/systemd.h>
-
-#include "../shared.h"
+#include <hw/shared.h>
 
 #include <limits.h>
 #include <stdio.h>

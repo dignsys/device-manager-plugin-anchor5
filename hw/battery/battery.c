@@ -25,7 +25,7 @@
 #include <dirent.h>
 
 #include <hw/battery.h>
-#include "../shared.h"
+#include <hw/shared.h>
 #include "../udev.h"
 
 #define BATTERY_ROOT_PATH "/sys/class/power_supply"

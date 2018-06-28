@@ -23,7 +23,7 @@
 #include <libudev.h>
 #include <glib.h>
 #include <string.h>
-#include "shared.h"
+#include <hw/shared.h>
 #include "udev.h"
 
 #define EVENT_KERNEL       "kernel"

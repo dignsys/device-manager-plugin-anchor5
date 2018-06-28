@@ -24,7 +24,7 @@
 #include <linux/limits.h>
 
 #include <hw/display.h>
-#include "../shared.h"
+#include <hw/shared.h>
 
 #ifndef BACKLIGHT_PATH
 //#define BACKLIGHT_PATH  "/sys/class/backlight/s6e36w1x01-bl"

@@ -17,6 +17,7 @@
  */
 
 #include <hw/usb_client.h>
+#include <hw/systemd.h>
 
 #include "../shared.h"
 
@@ -28,7 +29,6 @@
 #include <sys/mount.h>
 #include <usbg/usbg.h>
 #include <unistd.h>
-#include <systemd/sd-bus.h>
 
 #include <unistd.h>
 
@@ -585,125 +585,6 @@ static int cfs_set_gadget_strs(struct cfs_client *cfs_client,
 	SET_STR(serial, USBG_STR_SERIAL_NUMBER);
 #undef SET_STR
 	return ret;
-}
-
-#define SYSTEMD_DBUS_SERVICE "org.freedesktop.systemd1"
-#define SYSTEMD_DBUS_PATH "/org/freedesktop/systemd1"
-#define SYSTEMD_DBUS_MANAGER_IFACE "org.freedesktop.systemd1.Manager"
-
-#define SYSTEMD_SOCKET_SUFFIX ".socket"
-#define MAX_SOCKET_NAME 1024
-
-struct bus_ctx {
-	const char *unit;
-	sd_event *loop;
-};
-
-static int socket_started(sd_bus_message *m, void *userdata,
-			  sd_bus_error *ret_error)
-{
-	struct bus_ctx *ctx = userdata;
-	char *signal_unit;
-	int ret;
-
-	ret = sd_bus_message_read(m, "uoss", NULL, NULL, &signal_unit, NULL);
-	if (ret < 0) {
-		sd_event_exit(ctx->loop, ret);
-		return 0;
-	}
-
-	if (!strcmp(signal_unit, ctx->unit))
-		sd_event_exit(ctx->loop, 0);
-
-	return 0;
-}
-
-static int systemd_unit_interface_sync(const char *method, const char *unit,
-				       bool wait)
-{
-	sd_bus *bus = NULL;
-	sd_event *loop = NULL;
-	struct bus_ctx ctx;
-	int ret;
-
-	ret = sd_bus_open_system(&bus);
-	if (ret < 0)
-		return ret;
-
-	if (wait) {
-		ret = sd_event_new(&loop);
-		if (ret < 0)
-			goto unref_bus;
-
-		ctx.loop = loop;
-		ctx.unit = unit;
-
-		ret = sd_bus_attach_event(bus, loop, SD_EVENT_PRIORITY_NORMAL);
-		if (ret < 0)
-			goto unref_loop;
-
-		ret = sd_bus_add_match(bus, NULL,
-				       "type='signal',"
-				       "sender='" SYSTEMD_DBUS_SERVICE "',"
-				       "interface='" SYSTEMD_DBUS_MANAGER_IFACE "',"
-				       "member='JobRemoved',"
-				       "path_namespace='" SYSTEMD_DBUS_PATH "'",
-				       socket_started,
-				       &ctx);
-		if (ret < 0)
-			goto unref_loop;
-	}
-
-
-	ret = sd_bus_call_method(bus,
-			SYSTEMD_DBUS_SERVICE,
-			SYSTEMD_DBUS_PATH,
-			SYSTEMD_DBUS_MANAGER_IFACE,
-			method,
-			NULL,
-			NULL,
-			"ss",
-			unit,
-			"replace");
-	if (ret < 0)
-		goto unref_loop;
-
-	if (wait)
-		ret = sd_event_loop(loop);
-
-unref_loop:
-	if (wait)
-		sd_event_unref(loop);
-unref_bus:
-	sd_bus_unref(bus);
-	return ret;
-}
-
-static int systemd_start_socket(const char *socket_name)
-{
-	char unit[MAX_SOCKET_NAME];
-	int ret;
-
-	ret = snprintf(unit, sizeof(unit), "%s" SYSTEMD_SOCKET_SUFFIX,
-		       socket_name);
-	if (ret < 0 || ret >= sizeof(unit))
-		return -ENAMETOOLONG;
-
-
-	return systemd_unit_interface_sync("StartUnit", unit, true);
-}
-
-static int systemd_stop_socket(const char *socket_name)
-{
-	char unit[MAX_SOCKET_NAME];
-	int ret;
-
-	ret = snprintf(unit, sizeof(unit), "%s" SYSTEMD_SOCKET_SUFFIX,
-		       socket_name);
-	if (ret < 0 || ret >= sizeof(unit))
-		return -ENAMETOOLONG;
-
-	return systemd_unit_interface_sync("StopUnit", unit, false);
 }
 
 static int cfs_ensure_dir(char *path)

@@ -17,6 +17,7 @@
  */
 
 #include <hw/usb_client.h>
+#include <hw/systemd.h>
 
 #include "../shared.h"
 
@@ -24,7 +25,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <systemd/sd-bus.h>
 
 #define zalloc(amount) calloc(1, amount)
 
@@ -62,63 +62,6 @@
 
 /* +5 to be always big enough */
 #define INT_BUF_SIZE (sizeof(int)*8 + 5)
-
-#define SYSTEMD_DBUS_SERVICE "org.freedesktop.systemd1"
-#define SYSTEMD_DBUS_PATH "/org/freedesktop/systemd1"
-#define SYSTEMD_DBUS_MANAGER_IFACE "org.freedesktop.systemd1.Manager"
-
-#define SYSTEMD_SERVICE_SUFFIX ".service"
-#define MAX_SERVICE_NAME 1024
-
-static int systemd_unit_interface(const char *method, const char *unit)
-{
-	sd_bus *bus = NULL;
-	int r;
-
-	r = sd_bus_open_system(&bus);
-	if (r < 0)
-		return r;
-
-	r = sd_bus_call_method(bus,
-			SYSTEMD_DBUS_SERVICE,
-			SYSTEMD_DBUS_PATH,
-			SYSTEMD_DBUS_MANAGER_IFACE,
-			method,
-			NULL,
-			NULL,
-			"ss",
-			unit,
-			"replace");
-
-	sd_bus_unref(bus);
-	return r;
-}
-
-static int systemd_start_service(const char *service_name)
-{
-	char unit[MAX_SERVICE_NAME];
-	int ret;
-
-	ret = snprintf(unit, sizeof(unit), "%s" SYSTEMD_SERVICE_SUFFIX,
-		       service_name);
-	if (ret < 0 || ret >= sizeof(unit))
-		return -ENAMETOOLONG;
-
-	return systemd_unit_interface("StartUnit", unit);
-}
-
-static int systemd_stop_service(const char *service_name)
-{
-	char unit[MAX_SERVICE_NAME];
-	int ret;
-
-	ret = snprintf(unit, sizeof(unit), "%s" SYSTEMD_SERVICE_SUFFIX,
-		       service_name);
-	if (ret < 0 || ret >= sizeof(unit))
-		return -ENAMETOOLONG;
-
-	return systemd_unit_interface("StopUnit", unit);
-}
 
 static int get_int_from_file(char *path, int *_val, int base)
 {

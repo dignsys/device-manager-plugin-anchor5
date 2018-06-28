@@ -4,7 +4,7 @@ PROJECT(usb_cfs_client C)
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 
 INCLUDE(FindPkgConfig)
-pkg_check_modules(usb_cfs_client_pkgs REQUIRED hwcommon dlog glib-2.0 libsystemd libusbgx)
+pkg_check_modules(usb_cfs_client_pkgs REQUIRED hwcommon dlog glib-2.0 libusbgx)
 
 FOREACH(flag ${usb_cfs_client_pkgs_CFLAGS})
 	SET(EXTRA_CFLAGS "${EXTRA_CFLAGS} ${flag}")

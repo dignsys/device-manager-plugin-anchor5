@@ -26,16 +26,29 @@
 #include <hw/display.h>
 #include <hw/shared.h>
 
+#define ANCHOR5
+
+#ifdef ANCHOR5
+#ifdef BACKLIGHT_PATH
+#undef BACKLIGHT_PATH
+#endif
+#define BACKLIGHT_PATH "/sys/class/backlight/hx8394d_bl"
+#else /* ANCHOR5 */
 #ifndef BACKLIGHT_PATH
 //#define BACKLIGHT_PATH  "/sys/class/backlight/s6e36w1x01-bl"
 #define BACKLIGHT_PATH  "/sys/class/backlight/s6e8fa0"
+#endif
 #endif
 
 #ifndef LCD_PATH
 #define LCD_PATH  "/sys/class/drm/card0"
 #endif
 
+#ifdef ANCHOR5
+#define MAX_BRIGHTNESS_TEMP 175
+#else
 #define MAX_BRIGHTNESS_TEMP 100
+#endif
 
 static int brightness_temp;
 

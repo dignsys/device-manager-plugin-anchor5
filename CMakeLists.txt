@@ -3,6 +3,8 @@ PROJECT(device-manager-artik C)
 
 SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${EXTRA_CFLAGS} -Wall -Werror")
+
 #ADD_SUBDIRECTORY(hw/battery)
 ADD_SUBDIRECTORY(hw/board)
 ADD_SUBDIRECTORY(hw/display)

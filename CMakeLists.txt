@@ -5,10 +5,8 @@ SET(PREFIX ${CMAKE_INSTALL_PREFIX})
 
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${EXTRA_CFLAGS} -Wall -Werror")
 
-#ADD_SUBDIRECTORY(hw/battery)
 ADD_SUBDIRECTORY(hw/board)
 ADD_SUBDIRECTORY(hw/display)
-#ADD_SUBDIRECTORY(hw/external_connection)
 ADD_SUBDIRECTORY(hw/led)
 ADD_SUBDIRECTORY(hw/touchscreen)
 ADD_SUBDIRECTORY(hw/usb_gadget)

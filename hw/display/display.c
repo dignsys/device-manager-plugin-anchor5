@@ -26,29 +26,16 @@
 #include <hw/display.h>
 #include <hw/shared.h>
 
-#define ANCHOR5
-
-#ifdef ANCHOR5
-#ifdef BACKLIGHT_PATH
-#undef BACKLIGHT_PATH
-#endif
-#define BACKLIGHT_PATH "/sys/class/backlight/hx8394d_bl"
-#else /* ANCHOR5 */
 #ifndef BACKLIGHT_PATH
-//#define BACKLIGHT_PATH  "/sys/class/backlight/s6e36w1x01-bl"
-#define BACKLIGHT_PATH  "/sys/class/backlight/s6e8fa0"
-#endif
-#endif
+#define BACKLIGHT_PATH "/sys/class/backlight/pwm-backlight"
+#endif /* BACKLIGHT_PATH */
+
 
 #ifndef LCD_PATH
 #define LCD_PATH  "/sys/class/drm/card0"
 #endif
 
-#ifdef ANCHOR5
-#define MAX_BRIGHTNESS_TEMP 175
-#else
-#define MAX_BRIGHTNESS_TEMP 100
-#endif
+#define MAX_BRIGHTNESS_TEMP 150
 
 static int brightness_temp;
 
@@ -105,6 +92,14 @@ static int display_set_brightness(int brightness)
 	if (brightness < 0 || brightness > max) {
 		_E("wrong parameter");
 		return -EINVAL;
+	}
+
+	/* 
+	 * ANCHOR5, skip brightness setting for lower 35%, because it is dark 
+	 * Minimum brightness : 40%
+	 */
+	if ( brightness < (int)(max * 0.35) ) {
+		return 0;
 	}
 
 	r = sys_set_int(BACKLIGHT_PATH"/brightness", brightness);

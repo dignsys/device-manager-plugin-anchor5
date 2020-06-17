@@ -95,10 +95,10 @@ static int display_set_brightness(int brightness)
 	}
 
 	/* 
-	 * ANCHOR5, skip brightness setting for lower 35%, because it is dark 
-	 * Minimum brightness : 40%
+	 * ANCHOR5, skip brightness setting for lower 20%, because it is dark 
+	 * Minimum brightness : 20%
 	 */
-	if ( brightness < (int)(max * 0.35) ) {
+	if ( brightness < (int)(max * 0.20) ) {
 		return 0;
 	}
 
